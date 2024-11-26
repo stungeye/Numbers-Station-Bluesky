@@ -39,6 +39,11 @@ async function main() {
       throw new Error("Missing required environment variables");
     }
 
+    if (Math.random() > 0.15) {
+      log("No luck this time!");
+      return;
+    }
+
     await agent.login({
       identifier: username,
       password: password,
@@ -62,8 +67,6 @@ async function main() {
     }
 
     console.log("Just posted!");
-
-    // Your bot logic will go here
   } catch (error) {
     log(`Error: ${error instanceof Error ? error.message : String(error)}`);
     // Exit with error code for cron to detect failure

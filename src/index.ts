@@ -3,6 +3,7 @@ import * as dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
 import { CrypticSignal } from "./numbers";
+import NumbersStationPoster from "./numbers_station_poster";
 
 // Load environment variables from .env file
 dotenv.config();
@@ -40,11 +41,12 @@ async function main() {
     }
 
     const rnd = Math.random();
-
+    /*
     if (rnd > 0.03) {
       log(`No luck this time! ${rnd}`);
       return;
     }
+      */
 
     await agent.login({
       identifier: username,
@@ -54,19 +56,23 @@ async function main() {
     log(`Successfully logged in to Bluesky! ${rnd}`);
 
     const cs = new CrypticSignal();
-    const [broadcast, language] = cs.generateBroadcast();
+    const broadcast = cs.generateBroadcast();
 
     // Language isn't one of the following: en, it, de, ru, zh, morse
-    if (!["en", "it", "de", "ru", "zh", "morse"].includes(language)) {
-      log(`Invalid language: ${language}`);
+    if (!["en", "it", "de", "ru", "zh", "morse"].includes(broadcast.language)) {
+      log(`Invalid language: ${broadcast.language}`);
       return;
     } else {
-      log(`Language: ${language}`);
+      log(`Language: ${broadcast.language}`);
     }
 
-    log(broadcast);
-    log(`Character Count: ${broadcast.length}`);
+    log(broadcast.message);
+    log(`Character Count: ${broadcast.message.length}`);
 
+    const poster = new NumbersStationPoster(agent, log);
+    await poster.postToBluesky(broadcast);
+
+    /*
     if (broadcast.length < 299) {
       await agent.post({
         text: broadcast,
@@ -76,8 +82,7 @@ async function main() {
         text: "Ready? Ready?",
       });
     }
-
-    console.log("Just posted!");
+      */
   } catch (error) {
     log(`Error: ${error instanceof Error ? error.message : String(error)}`);
     // Exit with error code for cron to detect failure

@@ -1,3 +1,5 @@
+import { NumbersStationPost } from "./numbers_station_poster";
+
 export class CrypticSignal {
   FREQUENCIES: number[];
   INTERVALS: number[];
@@ -426,7 +428,7 @@ export class CrypticSignal {
     return [groups.join("\n"), this.PHONETIC_SYSTEM_LANGUAGES[systemKey]];
   }
 
-  generateBroadcast(): [string, string] {
+  generateBroadcast(): NumbersStationPost {
     const frequency =
       this.FREQUENCIES[Math.floor(Math.random() * this.FREQUENCIES.length)];
     const interference = this.generateInterference();
@@ -467,7 +469,7 @@ export class CrypticSignal {
       preMessage += "\n\n" + interference;
     }
 
-    return [preMessage, selected[1]];
+    return { message: preMessage, language: selected[1] };
   }
 
   generateMarkers(): string {

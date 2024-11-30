@@ -1,4 +1,4 @@
-import { BskyAgent } from "@atproto/api";
+import { AtpAgent } from "@atproto/api";
 import * as dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
@@ -26,7 +26,7 @@ const log = (message: string) => {
   console.log(message);
 };
 
-const agent = new BskyAgent({
+const agent = new AtpAgent({
   service: "https://bsky.social",
 });
 

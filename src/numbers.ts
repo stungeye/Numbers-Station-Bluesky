@@ -451,6 +451,7 @@ export class CrypticSignal {
       [this.generateNumberStationOutput(), "en"],
       [this.generateMorseMessage(), "morse"],
     ];
+
     messages.push([
       messages[0][0].split("\n").reverse().join("\n"),
       messages[0][1],
@@ -461,7 +462,6 @@ export class CrypticSignal {
     ]);
 
     const selected = messages[Math.floor(Math.random() * messages.length)];
-
     broadcast.push(selected[0]);
 
     let preMessage = broadcast.join("\n");

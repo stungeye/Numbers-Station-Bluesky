@@ -1,6 +1,7 @@
-import { BskyAgent } from "@atproto/api";
+import { AppBskyEmbedVideo, AtpAgent } from "@atproto/api";
 import { spawn } from "child_process";
 import path from "path";
+import fs from "fs";
 
 export interface NumbersStationPost {
   message: string;
@@ -8,10 +9,10 @@ export interface NumbersStationPost {
 }
 
 class NumbersStationPoster {
-  private agent: BskyAgent;
+  private agent: AtpAgent;
   private log: (message: string) => void;
 
-  constructor(agent: BskyAgent, log: (message: string) => void) {
+  constructor(agent: AtpAgent, log: (message: string) => void) {
     this.agent = agent;
     this.log = log;
   }
@@ -71,26 +72,41 @@ class NumbersStationPoster {
 
       this.log(`Morse code: ${morse}`);
       // Map Morse code symbols to tones using SoX
+      const unit = 0.08; // Duration of a dot
       const morseToneMap: Record<
         string,
         { frequency: number; duration: number }
       > = {
-        ".": { frequency: 700, duration: 0.1 }, // Dot: 100ms
-        "-": { frequency: 700, duration: 0.3 }, // Dash: 300ms
-        " ": { frequency: 0, duration: 0.2 }, // Pause between symbols: 200ms
+        ".": { frequency: 500, duration: unit },
+        "-": { frequency: 500, duration: 3 * unit },
+        " ": { frequency: 0, duration: 6 * unit },
       };
+
+      const shortPause = { frequency: 0, duration: unit }; // Pause between symbols: 100ms
 
       // Convert the valid Morse code into a SoX synth command sequence
       const soxCommands = morse
         .split("")
-        .map((symbol) => {
+        .flatMap((symbol) => {
           const { frequency, duration } = morseToneMap[symbol] || {
             frequency: 0,
-            duration: 0.2,
+            duration: 0.5,
           };
-          return frequency > 0
-            ? `synth ${duration} sine ${frequency}`
-            : `synth ${duration} sine 0`; // Silence for spaces
+
+          // Add a short pause after every symbol except spaces
+          const commands = [
+            frequency > 0
+              ? `synth ${duration} sine ${frequency}`
+              : `synth ${duration} sine 0`, // Silence for spaces
+          ];
+
+          if (symbol !== " ") {
+            commands.push(
+              `synth ${shortPause.duration} sine ${shortPause.frequency}`
+            ); // Add short pause
+          }
+
+          return commands;
         })
         .join(" : ");
 
@@ -207,20 +223,23 @@ class NumbersStationPoster {
       const mp4Path = await this.convertToMp4WithSpectrum(mixedWavPath);
       this.log(`Generated MP4 file with spectrum: ${mp4Path}`);
 
-      // Step 4: Post to Bluesky
-      /*
-      await this.agent.post({
-        text: post.message,
-        embed: {
-          $type: "app.bsky.embed.external",
-          external: {
-            uri: `file://${mp4Path}`,
-            title: `Numbers Station: ${post.language}`,
-            description: post.message,
-          },
-        },
+      // Step 4: Upload MP4 to Bluesky and post
+
+      const videoBuffer = await fs.promises.readFile(mp4Path);
+      const { data: blobData } = await this.agent.uploadBlob(videoBuffer, {
+        encoding: "video/mp4",
       });
-      */
+      this.log(`Uploaded MP4 as blob: ${blobData.blob}`);
+      console.dir(blobData);
+
+      await this.agent.post({
+        text: post.message.length < 299 ? post.message : "",
+        embed: {
+          $type: "app.bsky.embed.video",
+          video: blobData.blob,
+          aspectRatio: { width: 1280, height: 720 },
+        } satisfies AppBskyEmbedVideo.Main,
+      });
 
       this.log("Successfully posted to Bluesky");
     } catch (error) {

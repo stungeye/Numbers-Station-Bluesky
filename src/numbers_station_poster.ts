@@ -1,4 +1,9 @@
-import { AppBskyEmbedVideo, AtpAgent } from "@atproto/api";
+import {
+  AppBskyEmbedVideo,
+  AppBskyVideoDefs,
+  AtpAgent,
+  BlobRef,
+} from "@atproto/api";
 import { spawn } from "child_process";
 import path from "path";
 import fs from "fs";
@@ -137,7 +142,7 @@ class NumbersStationPoster {
     await this.runCommand(command, args);
     return wavPath;
   }
-  private async mixWithStatic(inputWavPath: string): Promise<string> {
+  private async mixWithStatic(inputWavPath: string): Promise<[string, number]> {
     const mixedWavPath = this.getFilePath("wav", "static");
 
     this.log("Mixing WAV file with static noise");
@@ -161,7 +166,7 @@ class NumbersStationPoster {
       mixedWavPath,
     ]);
 
-    return mixedWavPath;
+    return [mixedWavPath, duration];
   }
 
   private async getAudioDuration(filePath: string): Promise<number> {
@@ -216,27 +221,82 @@ class NumbersStationPoster {
       this.log(`Generated WAV file: ${wavPath}`);
 
       // Step 2: Mix WAV with static noise
-      const mixedWavPath = await this.mixWithStatic(wavPath);
+      const [mixedWavPath, duration] = await this.mixWithStatic(wavPath);
       this.log(`Mixed WAV file with static: ${mixedWavPath}`);
+
+      if (duration >= 60) {
+        this.log("Duration is too long, skipping embeds");
+        await this.agent.post({
+          text: post.message.length <= 300 ? post.message : "Ready? Ready?",
+        });
+        this.log("Successfully posted to Bluesky");
+        return;
+      }
 
       // Step 3: Convert WAV to MP4 with spectrum visualization
       const mp4Path = await this.convertToMp4WithSpectrum(mixedWavPath);
       this.log(`Generated MP4 file with spectrum: ${mp4Path}`);
 
-      // Step 4: Upload MP4 to Bluesky and post
-
       const videoBuffer = await fs.promises.readFile(mp4Path);
-      const { data: blobData } = await this.agent.uploadBlob(videoBuffer, {
-        encoding: "video/mp4",
-      });
-      this.log(`Uploaded MP4 as blob: ${blobData.blob}`);
-      console.dir(blobData);
+      const { size } = await fs.promises.stat(mp4Path);
 
+      // Step 4: Get Service Auth
+      const { data: serviceAuth } =
+        await this.agent.com.atproto.server.getServiceAuth({
+          aud: `did:web:${this.agent.dispatchUrl.host}`,
+          lxm: "com.atproto.repo.uploadBlob",
+          exp: Math.floor(Date.now() / 1000) + 60 * 30, // 30 minutes
+        });
+
+      const token = serviceAuth.token;
+
+      // Step 5: Upload video to Bluesky
+      const uploadUrl = new URL(
+        "https://video.bsky.app/xrpc/app.bsky.video.uploadVideo"
+      );
+      uploadUrl.searchParams.append("did", this.agent.session!.did);
+      uploadUrl.searchParams.append("name", mp4Path.split("/").pop()!);
+
+      this.log("Uploading video...");
+      const uploadResponse = await fetch(uploadUrl.toString(), {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "video/mp4",
+          "Content-Length": String(size),
+        },
+        body: videoBuffer, // Use the buffer directly
+      });
+
+      const jobStatus =
+        (await uploadResponse.json()) as AppBskyVideoDefs.JobStatus;
+      this.log(`Job ID: ${jobStatus.jobId}`);
+
+      const videoAgent = new AtpAgent({ service: "https://video.bsky.app" });
+
+      // Step 6: Wait for video processing to complete
+      let blob: BlobRef | undefined = jobStatus.blob;
+
+      while (!blob) {
+        const { data: status } = await videoAgent.app.bsky.video.getJobStatus({
+          jobId: jobStatus.jobId,
+        });
+        this.log(
+          `Status: ${status.jobStatus.state} ${status.jobStatus.progress || ""}`
+        );
+        if (status.jobStatus.blob) {
+          blob = status.jobStatus.blob;
+        }
+        // Wait a second before checking again
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+
+      // Step 7: Post to Bluesky with processed video
       await this.agent.post({
         text: post.message.length < 299 ? post.message : "",
         embed: {
           $type: "app.bsky.embed.video",
-          video: blobData.blob,
+          video: blob,
           aspectRatio: { width: 1280, height: 720 },
         } satisfies AppBskyEmbedVideo.Main,
       });

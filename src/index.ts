@@ -39,8 +39,10 @@ async function main() {
       throw new Error("Missing required environment variables");
     }
 
-    if (Math.random() > 0.15) {
-      log("No luck this time!");
+    const rnd = Math.random();
+
+    if (rnd > 0.03) {
+      log(`No luck this time! ${rnd}`);
       return;
     }
 
@@ -49,10 +51,19 @@ async function main() {
       password: password,
     });
 
-    log("Successfully logged in to Bluesky!");
+    log(`Successfully logged in to Bluesky! ${rnd}`);
 
     const cs = new CrypticSignal();
-    const broadcast = cs.generateBroadcast();
+    const [broadcast, language] = cs.generateBroadcast();
+
+    // Language isn't one of the following: en, it, de, ru, zh, morse
+    if (!["en", "it", "de", "ru", "zh", "morse"].includes(language)) {
+      log(`Invalid language: ${language}`);
+      return;
+    } else {
+      log(`Language: ${language}`);
+    }
+
     log(broadcast);
     log(`Character Count: ${broadcast.length}`);
 

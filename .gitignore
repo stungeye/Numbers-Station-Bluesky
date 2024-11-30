@@ -54,3 +54,7 @@ Thumbs.db
 
 # Debug files
 .node-xmlhttprequest-*
+
+# MP4 or WAV
+*.mp4
+*.wav

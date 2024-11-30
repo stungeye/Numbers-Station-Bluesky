@@ -1,6 +1,7 @@
 export class CrypticSignal {
   FREQUENCIES: number[];
   INTERVALS: number[];
+  PHONETIC_SYSTEM_LANGUAGES: { [key: string]: string };
   PHONETIC_SYSTEMS: { [key: string]: string[] };
   PREFIXES: string[];
   SUFFIXES: string[];
@@ -17,6 +18,14 @@ export class CrypticSignal {
   constructor() {
     this.FREQUENCIES = [4625, 4780, 5473, 6998, 7887];
     this.INTERVALS = [23, 37, 73, 89, 197];
+    this.PHONETIC_SYSTEM_LANGUAGES = {
+      ALPHA: "en",
+      BETA: "de",
+      GAMMA: "it",
+      PILOT: "en",
+      RUSSIAN: "ru",
+      CHINESE: "zh",
+    };
     this.PHONETIC_SYSTEMS = {
       ALPHA: [
         "ANNA",
@@ -396,7 +405,7 @@ export class CrypticSignal {
     return `${prefix}-${number}-${suffix}`;
   }
 
-  generateMessage(): string {
+  generateMessage(): [string, string] {
     const patternKey = Object.keys(this.PATTERNS)[
       Math.floor(Math.random() * Object.keys(this.PATTERNS).length)
     ];
@@ -414,10 +423,10 @@ export class CrypticSignal {
       return digits.map((d) => system[d]).join(" ");
     });
 
-    return groups.join("\n");
+    return [groups.join("\n"), this.PHONETIC_SYSTEM_LANGUAGES[systemKey]];
   }
 
-  generateBroadcast(): string {
+  generateBroadcast(): [string, string] {
     const frequency =
       this.FREQUENCIES[Math.floor(Math.random() * this.FREQUENCIES.length)];
     const interference = this.generateInterference();
@@ -437,20 +446,28 @@ export class CrypticSignal {
 
     let messages = [
       this.generateMessage(),
-      this.generateNumberStationOutput(),
-      this.generateMorseMessage(),
+      [this.generateNumberStationOutput(), "en"],
+      [this.generateMorseMessage(), "morse"],
     ];
-    messages.push(messages[0].split("\n").reverse().join("\n"));
-    messages.push(messages[1].split(" – ").reverse().join(" – "));
+    messages.push([
+      messages[0][0].split("\n").reverse().join("\n"),
+      messages[0][1],
+    ]);
+    messages.push([
+      messages[1][0].split(" – ").reverse().join(" – "),
+      messages[1][1],
+    ]);
 
-    broadcast.push(messages[Math.floor(Math.random() * messages.length)]);
+    const selected = messages[Math.floor(Math.random() * messages.length)];
+
+    broadcast.push(selected[0]);
 
     let preMessage = broadcast.join("\n");
     if (preMessage.length + interference.length < 295) {
-      return preMessage + "\n\n" + interference;
-    } else {
-      return preMessage;
+      preMessage += "\n\n" + interference;
     }
+
+    return [preMessage, selected[1]];
   }
 
   generateMarkers(): string {

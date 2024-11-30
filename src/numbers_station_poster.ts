@@ -225,7 +225,7 @@ class NumbersStationPoster {
       this.log(`Mixed WAV file with static: ${mixedWavPath}`);
 
       if (duration >= 60) {
-        this.log("Duration is too long, skipping embeds");
+        this.log("Duration is too long, skipping embeds: " + duration);
         await this.agent.post({
           text: post.message.length <= 300 ? post.message : "Ready? Ready?",
         });

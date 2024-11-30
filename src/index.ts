@@ -41,12 +41,11 @@ async function main() {
     }
 
     const rnd = Math.random();
-    /*
+
     if (rnd > 0.03) {
       log(`No luck this time! ${rnd}`);
       return;
     }
-      */
 
     await agent.login({
       identifier: username,
